@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guard Attendance Viewer</title>
+
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Flatpickr CSS & JS -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+  <style>
+    /* Loading overlay styles */
+    .loading-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); display: none;
+      justify-content: center; align-items: center; z-index: 999;
+    }
+    .loading-spinner {
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top: 4px solid #fff; border-radius: 50%;
+      width: 50px; height: 50px; animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0%{transform:rotate(0)}100%{transform:rotate(360deg)} }
+
+    /* Freeze table headers */
+    #resultTable thead th {
+      position: sticky;
+      top: 0;
+      background: #000000; /* Tailwind bg-blue-500 */
+      z-index: 10;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-md">
+    <h1 class="text-2xl font-bold mb-4 text-center text-gray-800">
+      Guard Attendance Data
+    </h1>
+
+    <!-- Input Form -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Ops Officer
+        </label>
+        <input
+          type="text" id="officer"
+          placeholder="e.g., HIRIDAYENDRA KUMAR DWIVEDI(098951)"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 " value="HIRIDAYENDRA KUMAR DWIVEDI(098951)"
+          
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Duty Date
+        </label>
+        <input
+          type="text" id="date"
+          placeholder="e.g., 10/May/2025"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          readonly
+        />
+      </div>
+    </div>
+
+    <button
+      onclick="fetchData()"
+      class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md mb-4"
+    >
+      Fetch Data
+    </button>
+    <button
+      id="checkBtn"
+      class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-md mb-6"
+      style="display: none;"
+    >
+      Check Late Time
+    </button>
+
+    <!-- Result Table -->
+    <div class="overflow-x-auto">
+      <table
+        id="resultTable"
+        class="min-w-full bg-white border border-gray-200 text-sm"
+      >
+        <thead class="bg-blue-500 text-white">
+          <tr id="tableHeader"></tr>
+        </thead>
+        <tbody id="tableBody" class="text-gray-700"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <script>
+    // Initialize Flatpickr on #date
+    flatpickr("#date", {
+      dateFormat: "d/M/Y",           // e.g. "10/May/2025"
+      defaultDate: new Date().fp_incr(-1),  // yesterday
+      allowInput: true
+    });
+
+    function formatTime(utcDateStr) {
+      if (!utcDateStr) return "-";
+      const date = new Date(utcDateStr);
+      if (isNaN(date)) return "-";
+      date.setUTCMinutes(date.getUTCMinutes() - 750);
+      const hours = String(date.getUTCHours()).padStart(2, "0");
+      const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+
+    async function fetchData() {
+      const officer = document.getElementById("officer").value.trim();
+      const date    = document.getElementById("date").value.trim();
+      if (!officer || !date) {
+        alert("Please enter both Ops Officer name and Duty Date.");
+        return;
+      }
+      document.getElementById("loadingOverlay").style.display = "flex";
+
+      const url =
+        "https://script.google.com/macros/s/AKfycbxNbc0lZaAEQwKC3XtZAz2bWynfbiZzY-9_d7vII7cHlChK4nKZ6hC1IGnUz18zRsz6fA/exec" +
+        "?officer=" + encodeURIComponent(officer) +
+        "&date="    + encodeURIComponent(date);
+
+      try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+        const thead = document.getElementById("tableHeader");
+        const tbody = document.getElementById("tableBody");
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        if (!Array.isArray(data) || data.length === 0) {
+          tbody.innerHTML =
+            `<tr><td colspan="100%" class="text-center py-4">No data found.</td></tr>`;
+          document.getElementById("checkBtn").style.display = "none";
+          return;
+        }
+
+        // Build headers
+        const headers = Object.keys(data[0]);
+        headers.forEach(h => {
+          const th = document.createElement("th");
+          th.className =
+            "sticky top-0 bg-blue-500 z-10 px-4 py-2 text-left border-b cursor-pointer";
+          th.textContent = h;
+          thead.appendChild(th);
+        });
+
+        // Build rows
+        data.forEach(row => {
+          const tr = document.createElement("tr");
+          headers.forEach(key => {
+            const td = document.createElement("td");
+            td.className = "px-4 py-2 border-b";
+            const lower = key.toLowerCase();
+            const val   = row[key];
+
+            if (lower === "from time" || lower === "to time") {
+              if (val) {
+                const d = new Date(val);
+                if (!isNaN(d)) {
+                  d.setUTCMinutes(d.getUTCMinutes() - 750);
+                  td.textContent = `${String(d.getUTCHours()).padStart(2, "0")}:00`;
+                }
+              }
+            } else if (lower.includes("time")) {
+              td.textContent = formatTime(val);
+            } else {
+              td.textContent = val || "-";
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+
+        document.getElementById("checkBtn").style.display = "inline-block";
+      } catch (err) {
+        console.error(err);
+        alert("Error fetching data.");
+        document.getElementById("checkBtn").style.display = "none";
+      } finally {
+        document.getElementById("loadingOverlay").style.display = "none";
+      }
+    }
+
+    // Grace period logic + auto-sort by Customer Name
+    document.getElementById("checkBtn").addEventListener("click", () => {
+      const grace = 29;
+      const rows  = Array.from(document.querySelectorAll("#tableBody tr"));
+      const headers = [...document.getElementById("tableHeader").children]
+        .map(th => th.textContent.toLowerCase());
+      const fromIdx = headers.indexOf("from time");
+      const inIdx   = headers.indexOf("attendance in date & time");
+      const toIdx   = headers.indexOf("to time");
+      const outIdx  = headers.indexOf("attendance out date & time");
+      const nameIdx = headers.indexOf("customer name");
+
+      // Highlight in/out
+      rows.forEach(tr => {
+        const cells = tr.children;
+        const [fh, fm] = cells[fromIdx].textContent.trim().split(":").map(Number);
+        const [ih, im] = cells[inIdx].textContent.trim().split(":").map(Number);
+        const [th, tm] = cells[toIdx].textContent.trim().split(":").map(Number);
+        const [oh, om] = cells[outIdx].textContent.trim().split(":").map(Number);
+
+        const fromM = fh*60 + fm, inM = ih*60 + im;
+        const toM   = th*60 + tm, outM = oh*60 + om;
+
+        [inIdx, outIdx].forEach(i => {
+          cells[i].classList.remove(
+            "bg-red-100","text-red-700","font-semibold",
+            "bg-green-100","text-green-700"
+          );
+        });
+
+        if (!isNaN(inM) && !isNaN(fromM)) {
+          if (inM > fromM + grace) {
+            cells[inIdx].classList.add("bg-red-100","text-red-700","font-semibold");
+          } else {
+            cells[inIdx].classList.add("bg-green-100","text-green-700");
+          }
+        }
+
+        if (!isNaN(outM) && !isNaN(toM)) {
+          if (outM >= toM - grace) {
+            cells[outIdx].classList.add("bg-green-100","text-green-700","font-semibold");
+          } else {
+            cells[outIdx].classList.add("bg-red-100","text-red-700","font-semibold");
+          }
+        }
+      });
+
+      // Then sort by Customer Name
+      if (nameIdx >= 0) {
+        rows.sort((a, b) => {
+          const aName = a.children[nameIdx].textContent.trim().toLowerCase();
+          const bName = b.children[nameIdx].textContent.trim().toLowerCase();
+          return aName.localeCompare(bName);
+        });
+        const tbody = document.getElementById("tableBody");
+        rows.forEach(r => tbody.appendChild(r));
+      }
+    });
+
+    // General header-click sorting
+    document.getElementById("tableHeader").addEventListener("click", e => {
+      if (e.target.tagName !== "TH") return;
+      const headers = Array.from(e.currentTarget.children);
+      const colIndex = headers.indexOf(e.target);
+      const tbody = document.getElementById("tableBody");
+      const rows  = Array.from(tbody.querySelectorAll("tr"));
+      rows.sort((a, b) => {
+        const at = a.children[colIndex].textContent.trim().toLowerCase();
+        const bt = b.children[colIndex].textContent.trim().toLowerCase();
+        return at.localeCompare(bt);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    });
+  </script>
+</body>
+</html>
