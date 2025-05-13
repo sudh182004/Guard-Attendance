@@ -31,7 +31,6 @@
     /* Freeze table headers */
     #resultTable thead th {
       position: sticky;
-      overflow-y: auto;
       top: 0;
       background: #000000; /* Tailwind bg-blue-500 */
       z-index: 10;
@@ -95,18 +94,19 @@
     </button>
 
     <!-- Result Table -->
-    <div class="overflow-x-auto">
-      <table
-        id="resultTable"
-        class="min-w-full bg-white border border-gray-200 text-sm"
-      >
-        <thead class="bg-blue-500 text-white">
-          <tr id="tableHeader"></tr>
-        </thead>
-        <tbody id="tableBody" class="text-gray-700"></tbody>
-      </table>
-    </div>
-  </div>
+  <div class="overflow-x-auto overflow-y-auto max-h-[400px]">
+  <table id="resultTable" class="min-w-full bg-white border border-gray-200 text-sm">
+    <thead class="bg-blue-500 text-white">
+      <tr id="tableHeader">
+
+      </tr>
+    </thead>
+    <tbody id="tableBody" class="text-gray-700">
+      <!-- Rows go here -->
+    </tbody>
+  </table>
+</div>
+
 
   <!-- Loading Overlay -->
   <div id="loadingOverlay" class="loading-overlay">
