@@ -126,25 +126,26 @@
       </div>
     </div>
   </div>
-
 <script>
   // Initialize Flatpickr on #date
   flatpickr("#date", {
-    dateFormat: "d/M/Y",           // e.g. "10/May/2025"
-    defaultDate: new Date().fp_incr(-1),  // yesterday
+    dateFormat: "d/M/Y",                   // e.g. "10/May/2025"
+    defaultDate: new Date().fp_incr(-1),   // yesterday
     allowInput: true
   });
 
+  // Convert UTC ISO string to local HH:MM (subtract 750 min)
   function formatTime(utcDateStr) {
     if (!utcDateStr) return "-";
     const date = new Date(utcDateStr);
     if (isNaN(date)) return "-";
     date.setUTCMinutes(date.getUTCMinutes() - 750);
-    const hours = String(date.getUTCHours()).padStart(2, "0");
+    const hours   = String(date.getUTCHours()).padStart(2, "0");
     const minutes = String(date.getUTCMinutes()).padStart(2, "0");
     return `${hours}:${minutes}`;
   }
 
+  // Main fetch + cache logic
   async function fetchData() {
     const officer = document.getElementById("officer").value.trim();
     const date    = document.getElementById("date").value.trim();
@@ -152,65 +153,32 @@
       alert("Please enter both Ops Officer name and Duty Date.");
       return;
     }
-    document.getElementById("loadingOverlay").style.display = "flex";
 
-    const url =
-      "https://script.google.com/macros/s/AKfycby1oNRsnYfCRX3YQHuORlfsQZYd4hxdWbg9G-2-liv05sz1HIzBQt-Sn8eA5PGiPKHEIQ/exec" +
-      "?officer=" + encodeURIComponent(officer) +
-      "&date="    + encodeURIComponent(date);
+    const cacheKey = `attendance_${officer}_${date}`;
+    const cached   = localStorage.getItem(cacheKey);
+    if (cached) {
+      // Cache hit: render immediately
+      const data = JSON.parse(cached);
+      renderTable(data);
+      document.getElementById("checkBtn").style.display = "inline-block";
+      return;
+    }
+
+    // Cache miss: fetch from network
+    document.getElementById("loadingOverlay").style.display = "flex";
+    const url = 
+      "https://script.google.com/macros/s/AKfycby1oNRsnYfCRX3YQHuORlfsQZYd4hxdWbg9G-2-liv05sz1HIzBQt-Sn8eA5PGiPKHEIQ/exec"
+      + "?officer=" + encodeURIComponent(officer)
+      + "&date="    + encodeURIComponent(date);
 
     try {
       const resp = await fetch(url);
       const data = await resp.json();
-      const thead = document.getElementById("tableHeader");
-      const tbody = document.getElementById("tableBody");
-      thead.innerHTML = "";
-      tbody.innerHTML = "";
 
-      if (!Array.isArray(data) || data.length === 0) {
-        tbody.innerHTML =
-          `<tr><td colspan="100%" class="text-center py-4">No data found.</td></tr>`;
-        document.getElementById("checkBtn").style.display = "none";
-        return;
-      }
+      // Store in cache for next time
+      localStorage.setItem(cacheKey, JSON.stringify(data));
 
-      // Build headers
-      const headers = Object.keys(data[0]);
-      headers.forEach(h => {
-        const th = document.createElement("th");
-        th.className =
-          "sticky top-0 bg-blue-500 z-10 px-4 py-2 text-left border-b cursor-pointer";
-        th.textContent = h;
-        thead.appendChild(th);
-      });
-
-      // Build rows
-      data.forEach(row => {
-        const tr = document.createElement("tr");
-        headers.forEach(key => {
-          const td = document.createElement("td");
-          td.className = "px-4 py-2 border-b";
-          const lower = key.toLowerCase();
-          const val   = row[key];
-
-          if (lower === "from time" || lower === "to time") {
-            if (val) {
-              const d = new Date(val);
-              if (!isNaN(d)) {
-                d.setUTCMinutes(d.getUTCMinutes() - 750);
-                td.textContent = `${String(d.getUTCHours()).padStart(2, "0")}:00`;
-              }
-            }
-          } else if (lower.includes("time")) {
-            td.textContent = formatTime(val);
-          } else {
-            td.textContent = val || "-";
-          }
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
-
+      renderTable(data);
       document.getElementById("checkBtn").style.display = "inline-block";
     } catch (err) {
       console.error(err);
@@ -221,22 +189,74 @@
     }
   }
 
-  // Grace period logic + summary + modal wiring + auto-sort by Customer Name
+  // Renders thead/tbody based on JSON array `data`
+  function renderTable(data) {
+    const thead = document.getElementById("tableHeader");
+    const tbody = document.getElementById("tableBody");
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
+
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML =
+        `<tr><td colspan="100%" class="text-center py-4">No data found.</td></tr>`;
+      return;
+    }
+
+    // Build headers
+    const headers = Object.keys(data[0]);
+    headers.forEach(h => {
+      const th = document.createElement("th");
+      th.className =
+        "sticky top-0 bg-blue-500 z-10 px-4 py-2 text-left border-b cursor-pointer";
+      th.textContent = h;
+      thead.appendChild(th);
+    });
+
+    // Build rows
+    data.forEach(row => {
+      const tr = document.createElement("tr");
+      headers.forEach(key => {
+        const td    = document.createElement("td");
+        td.className = "px-4 py-2 border-b";
+        const lower = key.toLowerCase();
+        const val   = row[key] || "";
+
+        if (lower === "from time" || lower === "to time") {
+          if (val) {
+            const d = new Date(val);
+            d.setUTCMinutes(d.getUTCMinutes() - 750);
+            td.textContent = `${String(d.getUTCHours()).padStart(2,"0")}:00`;
+          }
+        }
+        else if (lower.includes("time")) {
+          td.textContent = formatTime(val);
+        }
+        else {
+          td.textContent = val;
+        }
+
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Grace period logic + summary + modal wiring + sort by Customer Name
   document.getElementById("checkBtn").addEventListener("click", () => {
     const grace = 29;
     const rows  = Array.from(document.querySelectorAll("#tableBody tr"));
-    const hdrs  = Array.from(document.getElementById("tableHeader").children)
-                       .map(th => th.textContent.toLowerCase());
+    const hdrs  = Array.from(
+      document.getElementById("tableHeader").children
+    ).map(th => th.textContent.toLowerCase());
 
     const fromIdx = hdrs.indexOf("from time");
     const inIdx   = hdrs.indexOf("attendance in date & time");
     const toIdx   = hdrs.indexOf("to time");
     const outIdx  = hdrs.indexOf("attendance out date & time");
     const nameIdx = hdrs.indexOf("employee name");
-    const cIdx = hdrs.indexOf("customer name");
+    const cIdx    = hdrs.indexOf("customer name");
     const codeIdx = hdrs.indexOf("employee code");
 
-    // Counters & lists
     let totalRows = rows.length,
         totalIn   = 0,
         totalOut  = 0,
@@ -248,7 +268,6 @@
           earlyList   = [],
           missingList = [];
 
-    // Highlight & collect
     rows.forEach(tr => {
       const cells = tr.children;
 
@@ -263,7 +282,7 @@
             toM   = th*60 + tm,
             outM  = oh*60 + om;
 
-      // Clear existing classes
+      // Clear old highlights
       [inIdx, outIdx].forEach(i => {
         cells[i].classList.remove(
           "bg-red-100","text-red-700","font-semibold",
@@ -289,7 +308,7 @@
         }
       }
 
-      // Summary logic
+      // Summary metrics
       const hasIn  = !isNaN(inM),
             hasOut = !isNaN(outM);
       if (hasIn)  totalIn++;
@@ -315,7 +334,7 @@
       }
     });
 
-    // Update summary panel
+    // Update daily summary
     document.getElementById("summaryScheduled").textContent = totalRows;
     document.getElementById("summaryIn").textContent        = totalIn;
     document.getElementById("summaryOut").textContent       = totalOut;
@@ -324,12 +343,12 @@
     document.getElementById("summaryLate").textContent      = lateIn;
     document.getElementById("summaryEarly").textContent     = earlyOut;
 
-    // Wire summary clicks to modal
+    // Modal wiring
     document.getElementById("summaryLate").onclick    = () => showModal("Late Punch‑INs", lateList);
     document.getElementById("summaryEarly").onclick   = () => showModal("Early Punch‑OUTs", earlyList);
     document.getElementById("summaryMissing").onclick = () => showModal("Missing IN/OUT", missingList);
 
-    // Then sort by Customer Name
+    // Auto‑sort by Customer Name
     if (cIdx >= 0) {
       rows.sort((a, b) => {
         const aName = a.children[cIdx].textContent.trim().toLowerCase();
@@ -341,7 +360,7 @@
     }
   });
 
-  // General header-click sorting
+  // Column‑click sorting
   document.getElementById("tableHeader").addEventListener("click", e => {
     if (e.target.tagName !== "TH") return;
     const headers = Array.from(e.currentTarget.children);
@@ -356,47 +375,39 @@
     rows.forEach(r => tbody.appendChild(r));
   });
 
-  // Modal for details
+  // Detail modal
   function showModal(title, items) {
-    const modal = document.getElementById("detailModal");
+    const modal   = document.getElementById("detailModal");
     const titleEl = document.getElementById("modalTitle");
     const listEl  = document.getElementById("modalList");
     titleEl.textContent = title;
-    listEl.innerHTML = items.map(item => `<li>${item}</li>`).join("");
+    listEl.innerHTML    = items.map(item => `<li>${item}</li>`).join("");
     modal.classList.remove("hidden");
   }
-
   function closeModal() {
     document.getElementById("detailModal").classList.add("hidden");
   }
 
-  //serach functionality
-  // Global search across Clock #, Employee Name, Customer Name
-document.getElementById("globalSearch").addEventListener("input", e => {
-  const term = e.target.value.trim().toLowerCase();
-  const rows = document.querySelectorAll("#tableBody tr");
-  // find indexes of the three columns
-  const hdrs = Array.from(document.getElementById("tableHeader").children)
-                    .map(th => th.textContent.toLowerCase());
-  const codeIdx  = hdrs.indexOf("employee code");
-  const nameIdx  = hdrs.indexOf("employee name");
-  const siteIdx  = hdrs.indexOf("customer name");
+  // Global search
+  document.getElementById("globalSearch").addEventListener("input", e => {
+    const term = e.target.value.trim().toLowerCase();
+    const rows = document.querySelectorAll("#tableBody tr");
+    const hdrs = Array.from(
+      document.getElementById("tableHeader").children
+    ).map(th => th.textContent.toLowerCase());
+    const codeIdx = hdrs.indexOf("employee code");
+    const nameIdx = hdrs.indexOf("employee name");
+    const siteIdx = hdrs.indexOf("customer name");
 
-  rows.forEach(tr => {
-    const cells = tr.children;
-    const code = cells[codeIdx]?.textContent.trim().toLowerCase() || "";
-    const name = cells[nameIdx]?.textContent.trim().toLowerCase() || "";
-    const site = cells[siteIdx]?.textContent.trim().toLowerCase() || "";
-
-    // show the row if any field contains the term
-    if (code.includes(term) || name.includes(term) || site.includes(term)) {
-      tr.style.display = "";
-    } else {
-      tr.style.display = "none";
-    }
+    rows.forEach(tr => {
+      const cells = tr.children;
+      const code = cells[codeIdx]?.textContent.trim().toLowerCase() || "";
+      const name = cells[nameIdx]?.textContent.trim().toLowerCase() || "";
+      const site = cells[siteIdx]?.textContent.trim().toLowerCase() || "";
+      tr.style.display = (code.includes(term) || name.includes(term) || site.includes(term))
+                         ? "" : "none";
+    });
   });
-});
-  
 </script>
 
 
