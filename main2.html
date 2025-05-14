@@ -10,115 +10,103 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <style>
-    .loading-overlay {
-      position: fixed; inset:0;
-      background: rgba(0,0,0,0.5);
-      display: none; align-items:center; justify-content:center; z-index:999;
-    }
-    .loading-spinner {
-      border: 4px solid rgba(255,255,255,0.3);
-      border-top: 4px solid #fff; border-radius:50%;
-      width:50px; height:50px; animation:spin 1s linear infinite;
-    }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    #resultTable thead th {
-      position: sticky; top: 0;
-      background: #000; z-index: 10;
-    }
+    .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: none; align-items: center; justify-content: center; z-index: 50; }
+    .loading-spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #fff; border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #resultTable thead th { position: sticky; top: 0; background: #1f2937; z-index: 10; }
   </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-4">
-
-  <div class="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-md">
-    <h1 class="text-2xl font-bold mb-4 text-center text-gray-800">
-      Guard Attendance Data
-    </h1>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen p-4 sm:p-6">
+  <div class="max-w-6xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
+    <h1 class="text-3xl sm:text-4xl font-extrabold mb-6 text-center">Guard Attendance Data</h1>
 
     <!-- Inputs -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Ops Officer</label>
-        <select id="officer" class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400">
+        <label for="officer" class="block text-sm font-medium mb-2">Ops Officer</label>
+        <select id="officer" class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700">
           <option value="">Select an officer</option>
-          <option value="DEVENDER SINGH(050076)">DEVENDER SINGH (050076)</option>
-          <option value="ASHOK KUMAR SINGH(004466)">ASHOK KUMAR SINGH (004466)</option>
-          <option value="OMKAR SINGH(001807)">OMKAR SINGH (001807)</option>
-          <option value="BHARAT KUMAR(900330)">BHARAT KUMAR (900330)</option>
-          <option value="SHASHIKANT SINGH(051875)">SHASHIKANT SINGH (051875)</option>
-          <option value="HIRIDAYENDRA KUMAR DWIVEDI(098951)">HIRIDAYENDRA KUMAR DWIVEDI (098951)</option>
-          <option value="Dilip Kumar Pandey(963023)">Dilip Kumar Pandey (963023)</option>
-          <option value="TAJENDER PRATAP SINGH(098508)">TAJENDER PRATAP SINGH (098508)</option>
-          <option value="Ravendra Singh Raghav(003668)">Ravendra Singh Raghav (003668)</option>
+            <option value="">Select an officer</option>
+    <option value="DEVENDER SINGH(050076)">DEVENDER SINGH (050076)</option>
+    <option value="ASHOK KUMAR SINGH(004466)">ASHOK KUMAR SINGH (004466)</option>
+    <option value="OMKAR SINGH(001807)">OMKAR SINGH (001807)</option>
+    <option value="BHARAT KUMAR(900330)">BHARAT KUMAR (900330)</option>
+    <option value="SHASHIKANT SINGH(051875)">SHASHIKANT SINGH (051875)</option>
+    <option value="HIRIDAYENDRA KUMAR DWIVEDI(098951)">HIRIDAYENDRA KUMAR DWIVEDI (098951)</option>
+    <option value="Dilip Kumar Pandey(963023)">Dilip Kumar Pandey (963023)</option>
+    <option value="TAJENDER PRATAP SINGH(098508)">TAJENDER PRATAP SINGH (098508)</option>
+    <option value="Ravendra Singh Raghav(003668)">Ravendra Singh Raghav (003668)</option>
         </select>
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Duty Date</label>
-        <input type="text" id="date" readonly
-               placeholder="e.g., 10/May/2025"
-               class="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-400"/>
+        <label for="date" class="block text-sm font-medium mb-2">Duty Date</label>
+        <input type="text" id="date" readonly placeholder="e.g., 10/May/2025"
+               class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700"/>
       </div>
     </div>
 
-    <div class="mb-4">
-      <button onclick="fetchData()"
-              class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded mr-2">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 mb-6">
+      <button onclick="fetchData()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition">
         Fetch Data
       </button>
-      <button id="checkBtn" style="display:none"
-              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded">
+      <button id="checkBtn" class="hidden w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg transition mt-4 sm:mt-0">
         Check Late Time
       </button>
     </div>
 
     <!-- Daily Summary -->
-    <div id="dailySummary" class="bg-gray-50 p-4 mb-6 rounded border">
-      <h2 class="text-lg font-semibold mb-2">📋 Daily Attendance Summary</h2>
-      <p>Total Guards Scheduled: <span id="summaryScheduled" class="font-bold">0</span></p>
-      <p>Total Punch-INs Recorded: <span id="summaryIn" class="font-bold">0</span></p>
-      <p>Total Punch-OUTs Recorded: <span id="summaryOut" class="font-bold">0</span></p>
-      <p>Perfect Attendance: <span id="summaryPerfect" class="font-bold">0</span></p>
-      <p>Missing IN/OUT Entries: <span id="summaryMissing" class="font-bold">0</span></p>
-      <p>Late Punch-INs (&gt;29 min): <span id="summaryLate" class="font-bold cursor-pointer">0</span></p>
-      <p>Early Punch-OUTs (&gt;29 min): <span id="summaryEarly" class="font-bold cursor-pointer">0</span></p>
-    </div>
-
-    <!-- Employee Highlights -->
-    <div id="highlights" class="max-w-4xl mx-auto bg-white p-6 rounded shadow mb-6 hidden">
-      <h2 class="text-xl font-semibold mb-4">👤 Employee Performance Highlights</h2>
+    <div id="dailySummary" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600 mb-6">
+      <h2 class="text-xl font-semibold mb-3">📋 Daily Attendance Summary</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <h3 class="font-semibold">Arrived Late Today</h3>
-          <ul id="highlightLate" class="list-disc pl-5 text-gray-700"></ul>
+        <div class="space-y-1">
+          <p>Total Guards Scheduled: <span id="summaryScheduled" class="font-bold">0</span></p>
+          <p>Total Punch-INs Recorded: <span id="summaryIn" class="font-bold">0</span></p>
         </div>
-        <div>
-          <h3 class="font-semibold">Left Early Today</h3>
-          <ul id="highlightEarly" class="list-disc pl-5 text-gray-700"></ul>
+        <div class="space-y-1">
+          <p>Total Punch-OUTs Recorded: <span id="summaryOut" class="font-bold">0</span></p>
+          <p>Perfect Attendance: <span id="summaryPerfect" class="font-bold">0</span></p>
         </div>
-        <div>
-          <h3 class="font-semibold">Missing Punches Today</h3>
-          <ul id="highlightMissing" class="list-disc pl-5 text-gray-700"></ul>
+        <div class="space-y-1">
+          <p>Missing IN/OUT Entries: <span id="summaryMissing" class="font-bold cursor-pointer">0</span></p>
+          <p>Late Punch-INs (&gt;29 min): <span id="summaryLate" class="font-bold cursor-pointer">0</span></p>
+          <p>Early Punch-OUTs (&gt;29 min): <span id="summaryEarly" class="font-bold cursor-pointer">0</span></p>
         </div>
       </div>
     </div>
-    <div class="mb-4">
-  <label for="globalSearch" class="font-medium text-gray-700 mr-2">
-    🔍 
-  </label>
-  <input
-    id="globalSearch"
-    type="text"
-    placeholder="Type clock number, employee or site…"
-    class="border border-gray-300 rounded px-3 py-1 focus:ring-2 focus:ring-blue-400 w-1/2"
-  />
-</div>
+
+    <!-- Employee Highlights -->
+    <div id="highlights" class="hidden bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-2xl font-semibold mb-4">👤 Employee Performance Highlights</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <h3 class="text-lg font-medium mb-2">Arrived Late Today</h3>
+          <ul id="highlightLate" class="list-disc pl-5 space-y-1"></ul>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium mb-2">Left Early Today</h3>
+          <ul id="highlightEarly" class="list-disc pl-5 space-y-1"></ul>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium mb-2">Missing Punches Today</h3>
+          <ul id="highlightMissing" class="list-disc pl-5 space-y-1"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Search -->
+    <div class="mb-6">
+      <label for="globalSearch" class="block text-sm font-medium mb-2">🔍 Search</label>
+      <input id="globalSearch" type="text" placeholder="Clock #, Employee or Site…"
+             class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700"/>
+    </div>
 
     <!-- Result Table -->
-    <div class="overflow-x-auto overflow-y-auto max-h-[400px]">
-      <table id="resultTable" class="min-w-full bg-white border text-sm">
-        <thead class="bg-blue-500 text-white">
+    <div class="overflow-auto max-h-[500px] border border-gray-200 dark:border-gray-600 rounded-lg">
+      <table id="resultTable" class="min-w-full bg-white dark:bg-gray-800 text-sm">
+        <thead class="bg-indigo-600 text-white">
           <tr id="tableHeader"></tr>
         </thead>
-        <tbody id="tableBody" class="text-gray-700"></tbody>
+        <tbody id="tableBody" class="text-gray-700 dark:text-gray-200"></tbody>
       </table>
     </div>
   </div>
@@ -129,12 +117,12 @@
   </div>
 
   <!-- Detail Modal -->
-  <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-lg w-11/12 md:w-1/2 p-6">
-      <h3 id="modalTitle" class="text-xl font-semibold mb-4"></h3>
-      <ul id="modalList" class="list-disc pl-5 max-h-64 overflow-y-auto"></ul>
-      <div class="text-right mt-4">
-        <button onclick="closeModal()" class="bg-red-500 text-white px-4 py-2 rounded">Close</button>
+  <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" >
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-11/12 md:w-1/2 max-h-[80vh] p-6 overflow-auto" style="margin: 17px;">
+      <h3 id="modalTitle" class="text-2xl font-semibold mb-4"></h3>
+      <ul id="modalList" class="list-disc pl-5 space-y-1"></ul>
+      <div class="text-right mt-6">
+        <button onclick="closeModal()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg">Close</button>
       </div>
     </div>
   </div>
