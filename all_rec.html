@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Guard Attendance Viewer</title>
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Flatpickr -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <style>
+    .loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: none; align-items: center; justify-content: center; z-index: 50; }
+    .loading-spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #fff; border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #resultTable thead th { position: sticky; top: 0; background: #1f2937; z-index: 10; }
+  </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen p-4 sm:p-6">
+  <div class="max-w-6xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
+    <h1 class="text-3xl sm:text-4xl font-extrabold mb-6 text-center">Guard Attendance Data</h1>
+
+    <!-- Inputs -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div>
+        <label for="officer" class="block text-sm font-medium mb-2">Ops Officer</label>
+        <select id="officer" class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700">
+          <option value="">Select an officer</option>
+    <option value="DEVENDER SINGH(050076)">DEVENDER SINGH (050076)</option>
+    <option value="ASHOK KUMAR SINGH(004466)">ASHOK KUMAR SINGH (004466)</option>
+    <option value="OMKAR SINGH(001807)">OMKAR SINGH (001807)</option>
+    <option value="BHARAT KUMAR(900330)">BHARAT KUMAR (900330)</option>
+    <option value="SHASHIKANT SINGH(051875)">SHASHIKANT SINGH (051875)</option>
+    <option value="HIRIDAYENDRA KUMAR DWIVEDI(098951)">HIRIDAYENDRA KUMAR DWIVEDI (098951)</option>
+    <option value="Dilip Kumar Pandey(963023)">Dilip Kumar Pandey (963023)</option>
+    <option value="TAJENDER PRATAP SINGH(098508)">TAJENDER PRATAP SINGH (098508)</option>
+    <option value="Ravendra Singh Raghav(003668)">Ravendra Singh Raghav (003668)</option>
+        </select>
+      </div>
+      <div>
+        <label for="date" class="block text-sm font-medium mb-2">Duty Date</label>
+        <input type="text" id="date" readonly placeholder="e.g., 10/May/2025"
+               class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700"/>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 mb-6">
+      <button onclick="fetchData()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition">
+        Fetch Data
+      </button>
+      <button id="checkBtn" class="hidden w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg transition mt-4 sm:mt-0">
+        Check Late Time
+      </button>
+    </div>
+
+    <!-- Daily Summary -->
+    <div id="dailySummary" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600 mb-6">
+      <h2 class="text-xl font-semibold mb-3">📋 Daily Attendance Summary</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="space-y-1">
+          <p>Total Guards Scheduled: <span id="summaryScheduled" class="font-bold">0</span></p>
+          <p>Total Punch-INs Recorded: <span id="summaryIn" class="font-bold">0</span></p>
+        </div>
+        <div class="space-y-1">
+          <p>Total Punch-OUTs Recorded: <span id="summaryOut" class="font-bold">0</span></p>
+          <p>Perfect Attendance: <span id="summaryPerfect" class="font-bold">0</span></p>
+        </div>
+        <div class="space-y-1">
+          <p>Missing IN/OUT Entries: <span id="summaryMissing" class="font-bold cursor-pointer">0</span></p>
+          <p>Late Punch-INs (&gt;29 min): <span id="summaryLate" class="font-bold cursor-pointer">0</span></p>
+          <p>Early Punch-OUTs (&gt;29 min): <span id="summaryEarly" class="font-bold cursor-pointer">0</span></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Employee Highlights -->
+    <div id="highlights" class="hidden bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-2xl font-semibold mb-4">👤 Employee Performance Highlights</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <h3 class="text-lg font-medium mb-2">Arrived Late Today</h3>
+          <ul id="highlightLate" class="list-disc pl-5 space-y-1"></ul>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium mb-2">Left Early Today</h3>
+          <ul id="highlightEarly" class="list-disc pl-5 space-y-1"></ul>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium mb-2">Missing Punches Today</h3>
+          <ul id="highlightMissing" class="list-disc pl-5 space-y-1"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Search -->
+    <div class="mb-6">
+      <label for="globalSearch" class="block text-sm font-medium mb-2">🔍 Search</label>
+      <input id="globalSearch" type="text" placeholder="Clock #, Employee or Site…"
+             class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 dark:bg-gray-700"/>
+    </div>
+
+
+
+    <!-- Result Table -->
+    <div class="overflow-auto max-h-[500px] border border-gray-200 dark:border-gray-600 rounded-lg">
+      <table id="resultTable" class="min-w-full bg-white dark:bg-gray-800 text-sm">
+        <thead class="bg-indigo-600 text-white">
+          <tr id="tableHeader"></tr>
+        </thead>
+        <tbody id="tableBody" class="text-gray-700 dark:text-gray-200"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" >
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-11/12 md:w-1/2 max-h-[80vh] p-6 overflow-auto" style="margin: 17px;">
+      <h3 id="modalTitle" class="text-2xl font-semibold mb-4"></h3>
+      <ul id="modalList" class="list-disc pl-5 space-y-1"></ul>
+      <div class="text-right mt-6">
+        <button onclick="closeModal()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg">Close</button>
+      </div>
+    </div>
+  </div>
+<script>
+  // Initialize Flatpickr on #date
+  flatpickr("#date", {
+    dateFormat: "d/M/Y",                   // e.g. "10/May/2025"
+    defaultDate: new Date().fp_incr(-1),   // yesterday
+    allowInput: true
+  });
+
+  // Convert UTC ISO string to local HH:MM (subtract 750 min)
+  function formatTime(utcDateStr) {
+    if (!utcDateStr) return "-";
+    const date = new Date(utcDateStr);
+    if (isNaN(date)) return "-";
+    date.setUTCMinutes(date.getUTCMinutes() - 750);
+    const hours   = String(date.getUTCHours()).padStart(2, "0");
+    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  }
+
+  // Main fetch + cache logic
+  async function fetchData() {
+    const officer = document.getElementById("officer").value.trim();
+    const date    = document.getElementById("date").value.trim();
+    if (!officer || !date) {
+      alert("Please enter both Ops Officer name and Duty Date.");
+      return;
+    }
+
+    const cacheKey = `attendance_${officer}_${date}`;
+    const cached   = localStorage.getItem(cacheKey);
+    if (cached) {
+      // Cache hit: render immediately
+      const data = JSON.parse(cached);
+      renderTable(data);
+      document.getElementById("checkBtn").style.display = "inline-block";
+      return;
+    }
+
+    // Cache miss: fetch from network
+    document.getElementById("loadingOverlay").style.display = "flex";
+    const url = 
+      "https://script.google.com/macros/s/AKfycbyYMirfsMxD1_qwcZH5XkseZdObE2Pb90SHSp_UWpaL3SDxuNblXej7_n_48AIwI8SLKg/exec?mode=officer&"
+      + "?officer=" + encodeURIComponent(officer)
+      + "&date="    + encodeURIComponent(date);
+
+    try {
+      const resp = await fetch(url);
+      const data = await resp.json();
+
+      // Store in cache for next time
+      localStorage.setItem(cacheKey, JSON.stringify(data));
+
+      renderTable(data);
+      document.getElementById("checkBtn").style.display = "inline-block";
+    } catch (err) {
+      console.error(err);
+      alert("Error fetching data.");
+      document.getElementById("checkBtn").style.display = "none";
+    } finally {
+      document.getElementById("loadingOverlay").style.display = "none";
+    }
+  }
+
+  // Renders thead/tbody based on JSON array `data`
+  function renderTable(data) {
+    const thead = document.getElementById("tableHeader");
+    const tbody = document.getElementById("tableBody");
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
+
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML =
+        `<tr><td colspan="100%" class="text-center py-4">No data found.</td></tr>`;
+      return;
+    }
+
+    // Build headers
+    const headers = Object.keys(data[0]);
+    headers.forEach(h => {
+      const th = document.createElement("th");
+      th.className =
+        "sticky top-0 bg-blue-500 z-10 px-4 py-2 text-left border-b cursor-pointer";
+      th.textContent = h;
+      thead.appendChild(th);
+    });
+
+    // Build rows
+    data.forEach(row => {
+      const tr = document.createElement("tr");
+      headers.forEach(key => {
+        const td    = document.createElement("td");
+        td.className = "px-4 py-2 border-b";
+        const lower = key.toLowerCase();
+        const val   = row[key] || "";
+
+        if (lower === "from time" || lower === "to time") {
+          if (val) {
+            const d = new Date(val);
+            d.setUTCMinutes(d.getUTCMinutes() - 750);
+            td.textContent = `${String(d.getUTCHours()).padStart(2,"0")}:00`;
+          }
+        }
+        else if (lower.includes("time")) {
+          td.textContent = formatTime(val);
+        }
+        else {
+          td.textContent = val;
+        }
+
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Grace period logic + summary + modal wiring + sort by Customer Name
+  document.getElementById("checkBtn").addEventListener("click", () => {
+
+    const grace = 29;
+    const rows  = Array.from(document.querySelectorAll("#tableBody tr"));
+    const hdrs  = Array.from(
+      document.getElementById("tableHeader").children
+    ).map(th => th.textContent.toLowerCase());
+
+    const fromIdx = hdrs.indexOf("from time");
+    const inIdx   = hdrs.indexOf("attendance in date & time");
+    const toIdx   = hdrs.indexOf("to time");
+    const outIdx  = hdrs.indexOf("attendance out date & time");
+    const nameIdx = hdrs.indexOf("employee name");
+    const cIdx    = hdrs.indexOf("customer name");
+    const codeIdx = hdrs.indexOf("employee code");
+
+    let totalRows = rows.length,
+        totalIn   = 0,
+        totalOut  = 0,
+        perfect   = 0,
+        lateIn    = 0,
+        earlyOut  = 0;
+
+    const lateList    = [],
+          earlyList   = [],
+          missingList = [];
+
+    rows.forEach(tr => {
+      const cells = tr.children;
+
+      // parse times
+      const [fh, fm] = cells[fromIdx].textContent.trim().split(":").map(Number);
+      const [ih, im] = cells[inIdx].textContent.trim().split(":").map(Number);
+      const [th, tm] = cells[toIdx].textContent.trim().split(":").map(Number);
+      const [oh, om] = cells[outIdx].textContent.trim().split(":").map(Number);
+
+      const fromM = fh*60 + fm,
+            inM   = ih*60 + im,
+            toM   = th*60 + tm,
+            outM  = oh*60 + om;
+
+      // Clear old highlights
+      [inIdx, outIdx].forEach(i => {
+        cells[i].classList.remove(
+          "bg-red-100","text-red-700","font-semibold",
+          "bg-green-100","text-green-700"
+        );
+      });
+
+      // IN highlight
+      if (!isNaN(inM) && !isNaN(fromM)) {
+        if (inM > fromM + grace) {
+          cells[inIdx].classList.add("bg-red-100","text-red-700","font-semibold");
+        } else {
+          cells[inIdx].classList.add("bg-green-100","text-green-700");
+        }
+      }
+
+      // OUT highlight
+      if (!isNaN(outM) && !isNaN(toM)) {
+        if (outM < toM - grace) {
+          cells[outIdx].classList.add("bg-red-100","text-red-700","font-semibold");
+        } else {
+          cells[outIdx].classList.add("bg-green-100","text-green-700","font-semibold");
+        }
+      }
+
+      // Summary metrics
+      const hasIn  = !isNaN(inM),
+            hasOut = !isNaN(outM);
+      if (hasIn)  totalIn++;
+      if (hasOut) totalOut++;
+
+      const name = cells[nameIdx].textContent;
+      const code = cells[codeIdx].textContent;
+
+      if (!hasIn || !hasOut) {
+        missingList.push(`${name} (${code})`);
+      } else {
+        const isLate  = inM  > fromM + grace;
+        const isEarly = outM < toM   - grace;
+        if (isLate) {
+          lateIn++;
+          lateList.push(`${name} (${code})`);
+        }
+        if (isEarly) {
+          earlyOut++;
+          earlyList.push(`${name} (${code})`);
+        }
+        if (!isLate && !isEarly) perfect++;
+      }
+    });
+
+    // Update daily summary
+    document.getElementById("summaryScheduled").textContent = totalRows;
+    document.getElementById("summaryIn").textContent        = totalIn;
+    document.getElementById("summaryOut").textContent       = totalOut;
+    document.getElementById("summaryPerfect").textContent   = perfect;
+    document.getElementById("summaryMissing").textContent   = missingList.length;
+    document.getElementById("summaryLate").textContent      = lateIn;
+    document.getElementById("summaryEarly").textContent     = earlyOut;
+
+    // Modal wiring
+    document.getElementById("summaryLate").onclick    = () => showModal("Late Punch‑INs", lateList);
+    document.getElementById("summaryEarly").onclick   = () => showModal("Early Punch‑OUTs", earlyList);
+    document.getElementById("summaryMissing").onclick = () => showModal("Missing IN/OUT", missingList);
+
+    // Auto‑sort by Customer Name
+    if (cIdx >= 0) {
+      rows.sort((a, b) => {
+        const aName = a.children[cIdx].textContent.trim().toLowerCase();
+        const bName = b.children[cIdx].textContent.trim().toLowerCase();
+        return aName.localeCompare(bName);
+      });
+      const tbody = document.getElementById("tableBody");
+      rows.forEach(r => tbody.appendChild(r));
+    }
+  });
+
+  // Column‑click sorting
+  document.getElementById("tableHeader").addEventListener("click", e => {
+    if (e.target.tagName !== "TH") return;
+    const headers = Array.from(e.currentTarget.children);
+    const colIndex = headers.indexOf(e.target);
+    const tbody = document.getElementById("tableBody");
+    const rows  = Array.from(tbody.querySelectorAll("tr"));
+    rows.sort((a, b) => {
+      const at = a.children[colIndex].textContent.trim().toLowerCase();
+      const bt = b.children[colIndex].textContent.trim().toLowerCase();
+      return at.localeCompare(bt);
+    });
+    rows.forEach(r => tbody.appendChild(r));
+  });
+
+  // Detail modal
+  function showModal(title, items) {
+    const modal   = document.getElementById("detailModal");
+    const titleEl = document.getElementById("modalTitle");
+    const listEl  = document.getElementById("modalList");
+    titleEl.textContent = title;
+    listEl.innerHTML    = items.map(item => `<li>${item}</li>`).join("");
+    modal.classList.remove("hidden");
+  }
+  function closeModal() {
+    document.getElementById("detailModal").classList.add("hidden");
+  }
+
+  // Global search
+  document.getElementById("globalSearch").addEventListener("input", e => {
+    const term = e.target.value.trim().toLowerCase();
+    const rows = document.querySelectorAll("#tableBody tr");
+    const hdrs = Array.from(
+      document.getElementById("tableHeader").children
+    ).map(th => th.textContent.toLowerCase());
+    const codeIdx = hdrs.indexOf("employee code");
+    const nameIdx = hdrs.indexOf("employee name");
+    const siteIdx = hdrs.indexOf("customer name");
+
+    rows.forEach(tr => {
+      const cells = tr.children;
+      const code = cells[codeIdx]?.textContent.trim().toLowerCase() || "";
+      const name = cells[nameIdx]?.textContent.trim().toLowerCase() || "";
+      const site = cells[siteIdx]?.textContent.trim().toLowerCase() || "";
+      tr.style.display = (code.includes(term) || name.includes(term) || site.includes(term))
+                         ? "" : "none";
+    });
+  });
+</script>
+
+
+</body>
+</html>
