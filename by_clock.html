@@ -26,6 +26,7 @@
   <option value="current">Current Month</option>
   <option value="last">Last Month</option>
 </select>
+
     <p id="error" class="text-red-500 text-center mb-4"></p>
     <div id="resultsGrid" class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"></div>
   </div>
@@ -34,21 +35,51 @@
   <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center hidden z-50">
     <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-600"></div>
   </div>
-
-  <script>
-  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzsctEyYNvvHX3JQ2Lq62q3KMAME-fwZInMFRJZMItNx34TgdVUhjpGJmIvDCB34nA1gg/exec';
+<script>
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby-5_GMX2iEN-dXerMekXc711aJdLZbiIF5eEX0JHKowWBRvt-mze6QrRd4iFUXjb7_2g/exec';
   const overlay = document.getElementById('loadingOverlay');
   const errorDiv = document.getElementById('error');
   const grid = document.getElementById('resultsGrid');
 
+  const grace = 29; // Grace period in minutes
+
+  // Format time from ISO string, adjusted to IST (UTC+5:30)
   function formatTime(utcDateStr) {
     if (!utcDateStr) return "-";
     const date = new Date(utcDateStr);
     if (isNaN(date)) return "-";
-    date.setUTCMinutes(date.getUTCMinutes() - 750);
+    date.setUTCMinutes(date.getUTCMinutes() - 750); // IST offset: UTC-5:30 in minutes
     const hours = String(date.getUTCHours()).padStart(2, "0");
     const minutes = String(date.getUTCMinutes()).padStart(2, "0");
     return `${hours}:${minutes}`;
+  }
+
+  // Round down the hour from an ISO string, output as "HH:00"
+  function roundDownHour(isoString) {
+    if (!isoString) return "-";
+    const date = new Date(isoString);
+    if (isNaN(date)) return "-";
+    date.setUTCMinutes(date.getUTCMinutes() - 750); // IST offset
+    const hour = date.getUTCHours();
+    return `${String(hour).padStart(2, "0")}:00`;
+  }
+
+  function timeStrToMinutes(t) {
+    if (!t || t === '-') return NaN;
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  function statusClass(status, type = 'in') {
+    if (status === 'late' && type === 'in') return 'text-red-700 font-semibold';
+    if (status === 'early' && type === 'out') return 'text-red-700 font-semibold';
+    if (status === 'ontime') return 'text-green-700 font-semibold';
+    return 'text-gray-700';
+  }
+
+  function isScheduled(fromTime, inTime) {
+    // Consider scheduled only if both times are valid and not '-'
+    return fromTime !== '-' && fromTime !== '' && inTime !== '-' && inTime !== '';
   }
 
   document.getElementById('searchBtn').addEventListener('click', async () => {
@@ -63,6 +94,7 @@
     }
 
     overlay.classList.remove('hidden');
+
     try {
       const res = await fetch(`${WEB_APP_URL}?mode=clock&clock=${encodeURIComponent(code)}&month=${month}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -73,12 +105,57 @@
       if (!Array.isArray(data) || data.length === 0) {
         errorDiv.textContent = 'No records found.';
       } else {
+        let scheduledCount = 0;
+        let unscheduledCount = 0;
+        let scheduledDoneCount = 0;
+
         data.forEach(item => {
           const card = document.createElement('div');
           card.className = 'bg-white bg-opacity-80 backdrop-blur-md rounded-xl shadow-lg p-5 flex flex-col space-y-2 hover:scale-105 transition-transform';
-          
-          const inTime = formatTime(item['Attendance IN Date & Time'] || '-');
-          const outTime = formatTime(item['Attendance OUT Date & Time'] || '-');
+
+          // Format and round times
+          const fromTimeRaw = item['From Time'] || '-';
+          const toTimeRaw = item['To Time'] || '-';
+          const inTimeRaw = item['Attendance IN Date & Time'] || '-';
+          const outTimeRaw = item['Attendance OUT Date & Time'] || '-';
+
+          const fromTime = formatTime(fromTimeRaw);
+          const toTime = formatTime(toTimeRaw);
+          const inTime = formatTime(inTimeRaw);
+          const outTime = formatTime(outTimeRaw);
+
+          const fromTimeRounded = roundDownHour(fromTimeRaw);
+          const toTimeRounded = roundDownHour(toTimeRaw);
+
+          const fromM = timeStrToMinutes(fromTimeRounded);
+          const toM = timeStrToMinutes(toTimeRounded);
+
+          const inM = timeStrToMinutes(inTime);
+          const outM = timeStrToMinutes(outTime);
+
+          let inStatus = '', outStatus = '', doneStatus = '';
+
+          // Check if scheduled duty
+          const scheduled = isScheduled(fromTime, inTime);
+          if (scheduled) scheduledCount++;
+          else unscheduledCount++;
+
+          if (!isNaN(inM) && !isNaN(fromM)) {
+            inStatus = (inM > fromM + grace) ? 'late' : 'ontime';
+          }
+          if (!isNaN(outM) && !isNaN(toM)) {
+            outStatus = (outM < toM - grace) ? 'early' : 'ontime';
+          }
+
+          if (scheduled && inStatus === 'ontime' && outStatus === 'ontime') {
+            doneStatus = 'Yes';
+            scheduledDoneCount++;
+          } else if (scheduled) {
+            doneStatus = 'No';
+          } else {
+            // For unscheduled, no done status needed or mark as '-'
+            doneStatus = '-';
+          }
 
           card.innerHTML = `
             <h2 class="text-xl font-semibold text-indigo-700">${item['Employee Name']}</h2>
@@ -86,11 +163,29 @@
             <p><span class="font-medium text-gray-900">Customer:</span> ${item['Customer Name']}</p>
             <p><span class="font-medium text-gray-900">Duty Date:</span> ${item['Duty Date']}</p>
             <p><span class="font-medium text-gray-900">Ops Officer:</span> ${item['Ops Officer']}</p>
-            <p><span class="font-medium text-gray-900">IN Time:</span> ${inTime}</p>
-            <p><span class="font-medium text-gray-900">OUT Time:</span> ${outTime}</p>
+            <p style="display: none;"><span class="font-medium text-gray-900">From Time:</span> ${fromTime} (<em>Rounded: ${fromTimeRounded}</em>)</p>
+            <p><span class="font-medium text-gray-900">IN Time:</span> <span class="${statusClass(inStatus, 'in')}">${inTime}</span></p>
+            <p style="display: none;"><span class="font-medium text-gray-900">To Time:</span> ${toTime} (<em>Rounded: ${toTimeRounded}</em>)</p>
+            <p><span class="font-medium text-gray-900">OUT Time:</span> <span class="${statusClass(outStatus, 'out')}">${outTime}</span></p>
+            <p><span class="font-medium text-gray-900">Done:</span> ${doneStatus}</p>
           `;
+
           grid.appendChild(card);
         });
+
+        const totalDuty = scheduledCount + unscheduledCount;
+        const percentage = scheduledCount > 0 ? ((scheduledDoneCount / scheduledCount) * 100).toFixed(1) : '-';
+
+        const summaryCard = document.createElement('div');
+        summaryCard.className = 'bg-blue-50 border border-blue-300 rounded-xl shadow p-4 mb-4 text-blue-900 font-medium';
+        summaryCard.innerHTML = `
+          <p>Total Duty: <strong>${totalDuty}</strong></p>
+          <p>Total Schedule Duty: <strong>${scheduledCount}</strong></p>
+          <p>Total Unscheduled Duty: <strong>${unscheduledCount}</strong></p>
+          <p>Completion Ratio: <strong>${percentage}%</strong></p>
+        `;
+        grid.prepend(summaryCard);
+
       }
     } catch (err) {
       console.error(err);
@@ -100,6 +195,7 @@
     }
   });
 </script>
+
 
 </body>
 </html>
