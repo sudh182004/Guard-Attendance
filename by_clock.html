@@ -108,6 +108,8 @@
         let scheduledCount = 0;
         let unscheduledCount = 0;
         let scheduledDoneCount = 0;
+        let totalMinutes = 0;
+
 
         data.forEach(item => {
           const card = document.createElement('div');
@@ -116,6 +118,7 @@
           // Format and round times
           const fromTimeRaw = item['From Time'] || '-';
           const toTimeRaw = item['To Time'] || '-';
+          const Totaltime_cal = item["Total Time"] || "-";
           const inTimeRaw = item['Attendance IN Date & Time'] || '-';
           const outTimeRaw = item['Attendance OUT Date & Time'] || '-';
 
@@ -156,6 +159,13 @@
             // For unscheduled, no done status needed or mark as '-'
             doneStatus = '-';
           }
+          if (Totaltime_cal !== "-" && Totaltime_cal.includes(":")) {
+          const [hh, mm] = Totaltime_cal.split(":").map(Number);
+          if (!isNaN(hh) && !isNaN(mm)) {
+            totalMinutes += hh * 60 + mm;
+          }
+          }
+
 
           card.innerHTML = `
             <h2 class="text-xl font-semibold text-indigo-700">${item['Employee Name']}</h2>
@@ -163,6 +173,7 @@
             <p><span class="font-medium text-gray-900">Customer:</span> ${item['Customer Name']}</p>
             <p><span class="font-medium text-gray-900">Duty Date:</span> ${item['Duty Date']}</p>
             <p><span class="font-medium text-gray-900">Ops Officer:</span> ${item['Ops Officer']}</p>
+            <p><span class="font-medium text-gray-900">Total Time:</span> ${item['Total Time']}</p>
             <p style="display: none;"><span class="font-medium text-gray-900">From Time:</span> ${fromTime} (<em>Rounded: ${fromTimeRounded}</em>)</p>
             <p><span class="font-medium text-gray-900">IN Time:</span> <span class="${statusClass(inStatus, 'in')}">${inTime}</span></p>
             <p style="display: none;"><span class="font-medium text-gray-900">To Time:</span> ${toTime} (<em>Rounded: ${toTimeRounded}</em>)</p>
@@ -175,6 +186,10 @@
 
         const totalDuty = scheduledCount + unscheduledCount;
         const percentage = scheduledCount > 0 ? ((scheduledDoneCount / scheduledCount) * 100).toFixed(1) : '-';
+        const totalH = Math.floor(totalMinutes / 60);
+        const totalM = totalMinutes % 60;
+        const totalTimeFormatted = `${String(totalH).padStart(2, "0")}:${String(totalM).padStart(2, "0")}`;
+
 
         const summaryCard = document.createElement('div');
         summaryCard.className = 'bg-blue-50 border border-blue-300 rounded-xl shadow p-4 mb-4 text-blue-900 font-medium';
@@ -182,6 +197,7 @@
           <p>Total Duty: <strong>${totalDuty}</strong></p>
           <p>Total Schedule Duty: <strong>${scheduledCount}</strong></p>
           <p>Total Unscheduled Duty: <strong>${unscheduledCount}</strong></p>
+          <p>Total Time Done: <strong>${totalTimeFormatted}</strong></p>
           <p>Completion Ratio: <strong>${percentage}%</strong></p>
         `;
         grid.prepend(summaryCard);
@@ -194,6 +210,8 @@
       overlay.classList.add('hidden');
     }
   });
+
+  
 </script>
 
 
