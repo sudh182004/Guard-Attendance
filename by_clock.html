@@ -185,7 +185,7 @@
         });
 
         const totalDuty = scheduledCount + unscheduledCount;
-        const percentage = scheduledCount > 0 ? ((scheduledDoneCount / scheduledCount) * 100).toFixed(1) : '-';
+        const percentage = scheduledCount > 0 ? ((scheduledDoneCount / totalDuty) * 100).toFixed(1) : '-';
         const totalH = Math.floor(totalMinutes / 60);
         const totalM = totalMinutes % 60;
         const totalTimeFormatted = `${String(totalH).padStart(2, "0")}:${String(totalM).padStart(2, "0")}`;
@@ -217,3 +217,4 @@
 
 </body>
 </html>
+
