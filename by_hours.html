@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Officer Hours Dashboard</title>
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen flex flex-col items-center py-8 text-gray-900">
+
+  <main class="max-w-5xl mx-auto w-full px-4">
+    <h2 class="text-3xl font-bold mb-6 text-center text-gray-900">Officer Work Summary</h2>
+
+    <form id="filterForm" class="flex flex-col sm:flex-row sm:items-center justify-center gap-4 mb-6" onsubmit="event.preventDefault(); loadData();">
+      <label for="minHours" class="text-lg font-medium text-gray-900">Min Hours:</label>
+      <input 
+        type="number" 
+        id="minHours" 
+        name="minHours" 
+        value="0" 
+        min="0"
+        class="rounded-md px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 border border-gray-300 w-32"
+        aria-describedby="minHoursDesc"
+      />
+      <button 
+        type="submit" 
+        class="bg-blue-600 hover:bg-blue-700 transition rounded-md px-5 py-2 font-semibold shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-white"
+      >
+        Load Summary
+      </button>
+    </form>
+
+    <div id="output" class="overflow-x-auto text-gray-900"></div>
+  </main>
+
+  <script>
+    async function loadData() {
+      const minHours = document.getElementById("minHours").value || 0;
+      const url = `https://script.google.com/macros/s/AKfycbwt0DWnU3U5lVtPNb3Qpr5JFsI-YXAdNcqQ39YQ9auz9AUECpC2btbVTzla7Uk9ezn7Zg/exec?mode=summary&minHours=${encodeURIComponent(minHours)}`;
+
+      const output = document.getElementById("output");
+      output.innerHTML = `
+        <div role="status" class="flex justify-center items-center gap-2 p-4 text-blue-600">
+          <svg class="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span>Loading...</span>
+        </div>`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.message) {
+          output.innerHTML = `<p class="text-center text-yellow-600">${data.message}</p>`;
+          return;
+        }
+
+        if (!Array.isArray(data) || data.length === 0) {
+          output.innerHTML = "<p class='text-center'>No records found.</p>";
+          return;
+        }
+
+        // Build table header
+        let table = `<table class="min-w-full border border-gray-300 rounded-md divide-y divide-gray-300 text-sm bg-white text-gray-900">
+          <thead class="bg-blue-100">
+            <tr>`;
+
+        for (const key in data[0]) {
+          table += `<th class="px-4 py-2 text-left font-semibold">${key}</th>`;
+        }
+
+        table += `</tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">`;
+
+        // Table rows with hover effect
+        data.forEach(row => {
+          table += `<tr class="hover:bg-blue-100 transition">`;
+          for (const key in row) {
+            const cellText = String(row[key]).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            table += `<td class="px-4 py-2 align-top whitespace-nowrap">${cellText}</td>`;
+          }
+          table += `</tr>`;
+        });
+
+        table += `</tbody></table>`;
+
+        output.innerHTML = table;
+      } catch (err) {
+        output.innerHTML = `<p class="text-center text-red-600">Error: ${err.message}</p>`;
+      }
+    }
+  </script>
+
+</body>
+</html>
