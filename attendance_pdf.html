@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Gemini Auto Report</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #4b79a1, #283e51);
+      font-family: "Segoe UI", sans-serif;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+      padding: 30px 40px;
+      border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(255,255,255,0.15);
+      text-align: center;
+      width: 400px;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    input[type="file"] {
+      border: 2px dashed #cce2ff;
+      padding: 12px;
+      border-radius: 10px;
+      width: 100%;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button {
+      padding: 12px 18px;
+      background: #00d4ff;
+      border: none;
+      border-radius: 8px;
+      color: #00364c;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: transform 0.2s, background 0.3s;
+    }
+
+    button:hover {
+      transform: scale(1.04);
+      background: #55e5ff;
+    }
+
+    /* Loader Overlay */
+    #loader {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(3px);
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: #fff;
+      font-size: 18px;
+      z-index: 9999;
+    }
+
+    .spinner {
+      border: 5px solid rgba(255,255,255,0.3);
+      border-top: 5px solid #00d9ff;
+      border-radius: 50%;
+      width: 70px;
+      height: 70px;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 15px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+  <h2>Upload Images → Generate PDF</h2>
+  <input type="file" id="imgs" accept="image/*" multiple />
+  <button onclick="generate()">Generate Report</button>
+</div>
+
+<!-- Loader Overlay -->
+<div id="loader">
+  <div class="spinner"></div>
+  <div id="loader-text">Processing...</div>
+</div>
+
+
+<script>
+function showLoader(msg) {
+  document.getElementById("loader-text").textContent = msg;
+  document.getElementById("loader").style.display = "flex";
+}
+
+function hideLoader() {
+  document.getElementById("loader").style.display = "none";
+}
+
+async function generate() {
+  const files = document.getElementById("imgs").files;
+  if (!files.length) return alert("Please upload at least one image");
+
+  let formData = new FormData();
+  for (const f of files) {
+    formData.append("image_files", f);
+  }
+
+  try {
+    showLoader("Uploading Images...");
+
+    showLoader("Sending to Gemini for AI Extraction...");
+    const res = await fetch("https://attendance-backend-on8u.onrender.com/api/upload-images", {
+      method: "POST",
+      body: formData
+    });
+
+    if (!res.ok) {
+      hideLoader();
+      const err = await res.text();
+      console.error("Backend response:", err);
+      alert("Backend error: " + err);
+      return;
+    }
+
+    showLoader("Generating PDF Report...");
+    const blob = await res.blob();
+
+    showLoader("Preparing Download...");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Generated_Report.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    hideLoader();
+  } catch (e) {
+    hideLoader();
+    console.error(e);
+    alert("Failed to send request!" + e);
+  }
+}
+</script>
+
+</body>
+</html>
